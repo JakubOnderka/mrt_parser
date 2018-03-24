@@ -1,0 +1,21 @@
+[package]
+name = "mrt_parser"
+version = "0.1.0"
+authors = ["Jakub Onderka <ahoj@jakubonderka.cz>"]
+license = "BSD-2-Clause"
+keywords = ["ip", "ipv4", "ipv6", "network", "mrt", "bgp", "rfc6396"]
+categories = ["network-programming", "parsing", "data-structures"]
+readme = "README.md"
+repository = "https://github.com/JakubOnderka/mrt_parser"
+homepage = "https://github.com/JakubOnderka/mrt_parser"
+documentation = "https://docs.rs/mrt_parser"
+description = """
+Multi-Threaded Routing Toolkit (MRT) Routing Information Export Format parser (RFC 6396)
+"""
+
+[badges]
+travis-ci = { repository = "JakubOnderka/mrt_parser" }
+
+[dependencies]
+ip_network = "0.1.2"
+byteorder = "1"
