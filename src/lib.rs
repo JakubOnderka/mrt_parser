@@ -66,7 +66,7 @@ impl<R: ReadBytesExt> Parser<R> {
         })
     }
 
-    pub fn skip_table(&mut self, header: &MrtHeader) -> io::Result<()> {
+    pub fn skip_message(&mut self, header: &MrtHeader) -> io::Result<()> {
         read_exact(&mut self.reader, header.length as usize)?;
         Ok(())
     }
