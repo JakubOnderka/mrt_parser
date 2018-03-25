@@ -9,6 +9,15 @@ pub enum BgpAttribute {
 }
 
 impl BgpAttribute {
+    pub fn parse_all(input: &[u8]) -> io::Result<Vec<BgpAttribute>> {
+        let mut cursor = Cursor::new(input);
+        let mut output = vec![];
+        while cursor.position() < input.len() as u64 {
+            output.push(BgpAttribute::parse(&mut cursor)?);
+        }
+        Ok(output)
+    }
+
     pub fn parse<R: ReadBytesExt>(rdr: &mut R) -> io::Result<Self> {
         let flags = rdr.read_u8()?;
         let has_extra_length = (flags >> 4) & 0x1 == 1;

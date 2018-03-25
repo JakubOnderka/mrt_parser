@@ -1,7 +1,7 @@
 extern crate byteorder;
 extern crate ip_network;
 
-use std::io::{self, Cursor};
+use std::io;
 use std::str;
 use std::net::{Ipv6Addr, Ipv4Addr, IpAddr};
 use byteorder::{BigEndian, ReadBytesExt};
@@ -215,12 +215,7 @@ pub struct Afi {
 
 impl Afi {
     pub fn get_bgp_attributes(&self) -> io::Result<Vec<bgp::BgpAttribute>> {
-        let mut cursor = Cursor::new(&self.data);
-        let mut output = vec![];
-        while cursor.position() < self.data.len() as u64 {
-            output.push(bgp::BgpAttribute::parse(&mut cursor)?);
-        }
-        Ok(output)
+        bgp::BgpAttribute::parse_all(&self.data)
     }
 }
 
@@ -290,12 +285,7 @@ impl RibSubEntry {
     }
 
     pub fn get_bgp_attributes(&self) -> io::Result<Vec<bgp::BgpAttribute>> {
-        let mut cursor = Cursor::new(&self.data);
-        let mut output = vec![];
-        while cursor.position() < self.data.len() as u64 {
-            output.push(bgp::BgpAttribute::parse(&mut cursor)?);
-        }
-        Ok(output)
+        bgp::BgpAttribute::parse_all(&self.data)
     }
 }
 
