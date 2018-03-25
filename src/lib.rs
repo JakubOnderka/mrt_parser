@@ -53,6 +53,40 @@ impl<R: ReadBytesExt> Parser<R> {
         Ok(())
     }
 
+    pub fn read_afi(&mut self, subtype: TableDump) -> io::Result<Afi> {
+        let is_ipv6 = match subtype {
+            TableDump::AfiIpv4 => false,
+            TableDump::AfiIpv6 => true,
+            _ => unimplemented!("Only AFI_IPv4 and AFI_IPv6 subtypes are supported"),
+        };
+
+        let view_number = self.reader.read_u16::<BigEndian>()?;
+        let sequence_number = self.reader.read_u16::<BigEndian>()?;
+        let prefix_ip = read_ip_addr(&mut self.reader, is_ipv6)?;
+        let prefix_length = self.reader.read_u8()?;
+        let prefix = match prefix_ip {
+            IpAddr::V4(ip) => IpNetwork::V4(Ipv4Network::from(ip, prefix_length).unwrap()),
+            IpAddr::V6(ip) => IpNetwork::V6(Ipv6Network::from(ip, prefix_length).unwrap()),
+        };
+        let status = self.reader.read_u8()?;
+        let originated_time = self.reader.read_u32::<BigEndian>()?;
+        let peer_ip = read_ip_addr(&mut self.reader, is_ipv6)?;
+        let peer_as = self.reader.read_u16::<BigEndian>()?;
+        let attribute_length = self.reader.read_u16::<BigEndian>()?;
+        let data = read_exact(&mut self.reader, attribute_length as usize)?;
+
+        Ok(Afi {
+            view_number,
+            sequence_number,
+            prefix,
+            status,
+            originated_time,
+            peer_ip,
+            peer_as,
+            data,
+        })
+    }
+
     pub fn read_peer_index_table(&mut self) -> io::Result<PeerIndexTable> {
         let collector_bgp_id = self.reader.read_u32::<BigEndian>()?;
 
@@ -164,6 +198,29 @@ pub struct PeerEntry {
     pub peer_bgp_id: u32,
     pub ip_addr: IpAddr,
     pub asn: u32,
+}
+
+#[derive(Debug)]
+pub struct Afi {
+    pub view_number: u16,
+    pub sequence_number: u16,
+    pub prefix: IpNetwork,
+    pub status: u8,
+    pub originated_time: u32,
+    pub peer_ip: IpAddr,
+    pub peer_as: u16,
+    pub data: Vec<u8>,
+}
+
+impl Afi {
+    pub fn get_bgp_attributes(&self) -> io::Result<Vec<BgpAttribute>> {
+        let mut cursor = Cursor::new(&self.data);
+        let mut output = vec![];
+        while cursor.position() < self.data.len() as u64 {
+            output.push(BgpAttribute::parse(&mut cursor)?);
+        }
+        Ok(output)
+    }
 }
 
 fn read_ip_addr<R: ReadBytesExt>(rdr: &mut R, is_ipv6: bool) -> io::Result<IpAddr> {
