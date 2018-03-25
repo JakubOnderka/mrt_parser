@@ -4,6 +4,7 @@ use read_exact;
 
 #[derive(Debug)]
 pub enum Attribute {
+    Origin(AttributeOrigin),
     AsPath(AttributeAsPath),
     Unknown(u8),
 }
@@ -32,6 +33,7 @@ impl Attribute {
         let data = read_exact(rdr, length as usize)?;
 
         Ok(match type_id {
+            1 => Attribute::Origin(AttributeOrigin::parse(&data)?),
             2 => Attribute::AsPath(AttributeAsPath {
                 data,
             }),
@@ -53,6 +55,25 @@ impl AttributeAsPath {
             output.push(PathSegment::parse(&mut cursor)?);
         }
         Ok(output)
+    }
+}
+
+#[derive(Debug)]
+pub enum AttributeOrigin {
+    Igp,
+    Egp,
+    Incomplete,
+    Unknown(u8),
+}
+
+impl AttributeOrigin {
+    pub fn parse(value: &[u8]) -> io::Result<Self> {
+        Ok(match value[0] {
+            0 => AttributeOrigin::Igp,
+            1 => AttributeOrigin::Egp,
+            2 => AttributeOrigin::Incomplete,
+            _ => AttributeOrigin::Unknown(value[0]),
+        })
     }
 }
 
