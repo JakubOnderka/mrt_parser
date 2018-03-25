@@ -21,35 +21,35 @@ impl<R: ReadBytesExt> Parser<R> {
     }
 
     pub fn read_header(&mut self) -> io::Result<MrtHeader> {
-        let ts = self.reader.read_u32::<BigEndian>()?;
-        let type_ = self.reader.read_u16::<BigEndian>()?;
+        let timestamp = self.reader.read_u32::<BigEndian>()?;
+        let typ = self.reader.read_u16::<BigEndian>()?;
         let subtype = self.reader.read_u16::<BigEndian>()?;
         let length = self.reader.read_u32::<BigEndian>()?;
 
-        let typ = match type_ {
-            12 => TableType::Dump(match subtype {
-                1 => T1::AfiIpv4,
-                2 => T1::AfiIpv6,
-                _ => T1::Unknown(subtype),
+        let typ = match typ {
+            12 => MrtType::TableDump(match subtype {
+                1 => TableDump::AfiIpv4,
+                2 => TableDump::AfiIpv6,
+                _ => TableDump::Unknown(subtype),
             }),
-            13 => TableType::DumpV2(match subtype {
-                1 => T2::PeerIndex,
-                2 => T2::RibIpv4Unicast,
-                4 => T2::RibIpv6Unicast,
-                _ => T2::Unknown(subtype),
+            13 => MrtType::TableDumpV2(match subtype {
+                1 => TableDumpV2::PeerIndex,
+                2 => TableDumpV2::RibIpv4Unicast,
+                4 => TableDumpV2::RibIpv6Unicast,
+                _ => TableDumpV2::Unknown(subtype),
             }),
-            _ => TableType::Unknown(type_),
+            _ => MrtType::Unknown(typ),
         };
 
         Ok(MrtHeader {
-            ts,
+            timestamp,
             typ,
-            data_len: length,
+            length,
         })
     }
 
     pub fn skip_table(&mut self, header: &MrtHeader) -> io::Result<()> {
-        read_exact(&mut self.reader, header.data_len as usize)?;
+        read_exact(&mut self.reader, header.length as usize)?;
         Ok(())
     }
 
@@ -74,24 +74,24 @@ impl<R: ReadBytesExt> Parser<R> {
         })
     }
 
-    pub fn read_rib_entry(&mut self, type_: TableType) -> io::Result<RibEntry> {
+    pub fn read_rib_entry(&mut self, typ: MrtType) -> io::Result<RibEntry> {
         let sequence_number = self.reader.read_u32::<BigEndian>()?;
 
         let prefix_length = self.reader.read_u8()?;
         let prefix_bytes = ((prefix_length + 7) / 8) as usize;
         let prefix_buffer = read_exact(&mut self.reader, prefix_bytes)?;
 
-        let prefix = match type_ {
-            TableType::DumpV2(subtype) => {
+        let prefix = match typ {
+            MrtType::TableDumpV2(subtype) => {
                 match subtype {
-                    T2::RibIpv4Unicast => {
+                    TableDumpV2::RibIpv4Unicast => {
                         debug_assert!(prefix_length <= 32);
                         let mut parts: [u8; 4] = [0; 4];
                         parts[..prefix_bytes].copy_from_slice(prefix_buffer.as_slice());
                         let ip = Ipv4Addr::from(parts);
                         IpNetwork::V4(Ipv4Network::from(ip, prefix_length).unwrap())
                     },
-                    T2::RibIpv6Unicast => {
+                    TableDumpV2::RibIpv6Unicast => {
                         debug_assert!(prefix_length <= 128);
                         let mut parts: [u8; 16] = [0; 16];
                         parts[..prefix_bytes].copy_from_slice(prefix_buffer.as_slice());
@@ -119,14 +119,14 @@ impl<R: ReadBytesExt> Parser<R> {
 }
 
 #[derive(Debug, Clone)]
-pub enum T1 {
+pub enum TableDump {
     AfiIpv4,
     AfiIpv6,
     Unknown(u16),
 }
 
 #[derive(Debug, Clone)]
-pub enum T2 {
+pub enum TableDumpV2 {
     PeerIndex,
     RibIpv4Unicast,
     RibIpv6Unicast,
@@ -134,17 +134,17 @@ pub enum T2 {
 }
 
 #[derive(Debug, Clone)]
-pub enum TableType {
-    Dump(T1),
-    DumpV2(T2),
+pub enum MrtType {
+    TableDump(TableDump),
+    TableDumpV2(TableDumpV2),
     Unknown(u16),
 }
 
 #[derive(Debug)]
 pub struct MrtHeader {
-    pub ts: u32,
-    pub typ: TableType,
-    pub data_len: u32,
+    pub timestamp: u32,
+    pub typ: MrtType,
+    pub length: u32,
 }
 
 #[derive(Debug)]
