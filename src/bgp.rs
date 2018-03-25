@@ -3,17 +3,17 @@ use byteorder::{BigEndian, ReadBytesExt};
 use read_exact;
 
 #[derive(Debug)]
-pub enum BgpAttribute {
-    AsPath(BgpAttributeAsPath),
+pub enum Attribute {
+    AsPath(AttributeAsPath),
     Unknown(u8),
 }
 
-impl BgpAttribute {
-    pub fn parse_all(input: &[u8]) -> io::Result<Vec<BgpAttribute>> {
+impl Attribute {
+    pub fn parse_all(input: &[u8]) -> io::Result<Vec<Attribute>> {
         let mut cursor = Cursor::new(input);
         let mut output = vec![];
         while cursor.position() < input.len() as u64 {
-            output.push(BgpAttribute::parse(&mut cursor)?);
+            output.push(Attribute::parse(&mut cursor)?);
         }
         Ok(output)
     }
@@ -32,38 +32,38 @@ impl BgpAttribute {
         let data = read_exact(rdr, length as usize)?;
 
         Ok(match type_id {
-            2 => BgpAttribute::AsPath(BgpAttributeAsPath {
+            2 => Attribute::AsPath(AttributeAsPath {
                 data,
             }),
-            _ => BgpAttribute::Unknown(type_id),
+            _ => Attribute::Unknown(type_id),
         })
     }
 }
 
 #[derive(Debug)]
-pub struct BgpAttributeAsPath {
+pub struct AttributeAsPath {
     data: Vec<u8>,
 }
 
-impl BgpAttributeAsPath {
-    pub fn get_path_segments(&self) -> io::Result<Vec<BgpPathSegment>> {
+impl AttributeAsPath {
+    pub fn get_path_segments(&self) -> io::Result<Vec<PathSegment>> {
         let mut cursor = Cursor::new(&self.data);
         let mut output = vec![];
         while cursor.position() < self.data.len() as u64 {
-            output.push(BgpPathSegment::parse(&mut cursor)?);
+            output.push(PathSegment::parse(&mut cursor)?);
         }
         Ok(output)
     }
 }
 
 #[derive(Debug)]
-pub struct BgpPathSegment {
-    pub typ: BgpPathSegmentType,
+pub struct PathSegment {
+    pub typ: PathSegmentType,
     pub values: Vec<u32>,
 }
 
 #[derive(Debug, Eq, PartialEq)]
-pub enum BgpPathSegmentType {
+pub enum PathSegmentType {
     AsSet,
     AsSequence,
     AsConfedSequence,
@@ -71,15 +71,15 @@ pub enum BgpPathSegmentType {
     Unknown(u8),
 }
 
-impl BgpPathSegment {
+impl PathSegment {
     pub fn parse<R: ReadBytesExt>(rdr: &mut R) -> io::Result<Self> {
         let seg_type = rdr.read_u8()?;
         let typ = match seg_type {
-            1 => BgpPathSegmentType::AsSet,
-            2 => BgpPathSegmentType::AsSequence,
-            3 => BgpPathSegmentType::AsConfedSequence,
-            4 => BgpPathSegmentType::AsConfedSet,
-            _ => BgpPathSegmentType::Unknown(seg_type),
+            1 => PathSegmentType::AsSet,
+            2 => PathSegmentType::AsSequence,
+            3 => PathSegmentType::AsConfedSequence,
+            4 => PathSegmentType::AsConfedSet,
+            _ => PathSegmentType::Unknown(seg_type),
         };
 
         let count = rdr.read_u8()?;

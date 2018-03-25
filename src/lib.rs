@@ -214,8 +214,8 @@ pub struct Afi {
 }
 
 impl Afi {
-    pub fn get_bgp_attributes(&self) -> io::Result<Vec<bgp::BgpAttribute>> {
-        bgp::BgpAttribute::parse_all(&self.data)
+    pub fn get_bgp_attributes(&self) -> io::Result<Vec<bgp::Attribute>> {
+        bgp::Attribute::parse_all(&self.data)
     }
 }
 
@@ -284,8 +284,8 @@ impl RibSubEntry {
         })
     }
 
-    pub fn get_bgp_attributes(&self) -> io::Result<Vec<bgp::BgpAttribute>> {
-        bgp::BgpAttribute::parse_all(&self.data)
+    pub fn get_bgp_attributes(&self) -> io::Result<Vec<bgp::Attribute>> {
+        bgp::Attribute::parse_all(&self.data)
     }
 }
 
