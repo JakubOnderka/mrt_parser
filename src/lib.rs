@@ -10,6 +10,23 @@ use ip_network::{IpNetwork, Ipv4Network, Ipv6Network};
 pub mod bgp;
 pub mod processor;
 
+fn read_ip_addr<R: ReadBytesExt>(rdr: &mut R, is_ipv6: bool) -> io::Result<IpAddr> {
+    if is_ipv6 {
+        Ok(IpAddr::V6(Ipv6Addr::new(
+            rdr.read_u16::<BigEndian>()?,
+            rdr.read_u16::<BigEndian>()?,
+            rdr.read_u16::<BigEndian>()?,
+            rdr.read_u16::<BigEndian>()?,
+            rdr.read_u16::<BigEndian>()?,
+            rdr.read_u16::<BigEndian>()?,
+            rdr.read_u16::<BigEndian>()?,
+            rdr.read_u16::<BigEndian>()?,
+        )))
+    } else {
+        Ok(IpAddr::V4(Ipv4Addr::from(rdr.read_u32::<BigEndian>()?)))
+    }
+}
+
 pub struct Parser<R: ReadBytesExt> {
     reader: R,
 }
@@ -104,7 +121,7 @@ impl<R: ReadBytesExt> Parser<R> {
 
         let mut peer_entries = Vec::with_capacity(peer_count as usize);
         for _ in 0..peer_count {
-            peer_entries.push(read_peer_entry(&mut self.reader)?);
+            peer_entries.push(PeerEntry::parse(&mut self.reader)?);
         }
 
         Ok(PeerIndexTable {
@@ -201,6 +218,28 @@ pub struct PeerEntry {
     pub asn: u32,
 }
 
+impl PeerEntry {
+    fn parse<R: ReadBytesExt>(rdr: &mut R) -> io::Result<Self> {
+        let type_ = rdr.read_u8()?;
+        let is_ipv6 = ((type_) & 0x1) == 1;
+        let is_asn_32bit = ((type_ >> 1) & 0x1) == 1;
+
+        let peer_bgp_id = rdr.read_u32::<BigEndian>()?;
+        let ip_addr = read_ip_addr(rdr, is_ipv6)?;
+        let asn = if is_asn_32bit {
+            rdr.read_u32::<BigEndian>()?
+        } else {
+            rdr.read_u16::<BigEndian>()? as u32
+        };
+
+        Ok(Self {
+            peer_bgp_id,
+            ip_addr,
+            asn
+        })
+    }
+}
+
 #[derive(Debug)]
 pub struct Afi {
     pub view_number: u16,
@@ -210,50 +249,13 @@ pub struct Afi {
     pub originated_time: u32,
     pub peer_ip: IpAddr,
     pub peer_as: u16,
-    pub data: Vec<u8>,
+    data: Vec<u8>,
 }
 
 impl Afi {
     pub fn get_bgp_attributes(&self) -> io::Result<Vec<bgp::Attribute>> {
         bgp::Attribute::parse_all(&self.data)
     }
-}
-
-fn read_ip_addr<R: ReadBytesExt>(rdr: &mut R, is_ipv6: bool) -> io::Result<IpAddr> {
-    if is_ipv6 {
-        Ok(IpAddr::V6(Ipv6Addr::new(
-            rdr.read_u16::<BigEndian>()?,
-            rdr.read_u16::<BigEndian>()?,
-            rdr.read_u16::<BigEndian>()?,
-            rdr.read_u16::<BigEndian>()?,
-            rdr.read_u16::<BigEndian>()?,
-            rdr.read_u16::<BigEndian>()?,
-            rdr.read_u16::<BigEndian>()?,
-            rdr.read_u16::<BigEndian>()?,
-        )))
-    } else {
-        Ok(IpAddr::V4(Ipv4Addr::from(rdr.read_u32::<BigEndian>()?)))
-    }
-}
-
-fn read_peer_entry<R: ReadBytesExt>(rdr: &mut R) -> io::Result<PeerEntry> {
-    let type_ = rdr.read_u8()?;
-    let is_ipv6 = ((type_) & 0x1) == 1;
-    let is_asn_32bit = ((type_ >> 1) & 0x1) == 1;
-
-    let peer_bgp_id = rdr.read_u32::<BigEndian>()?;
-    let ip_addr = read_ip_addr(rdr, is_ipv6)?;
-    let asn = if is_asn_32bit {
-        rdr.read_u32::<BigEndian>()?
-    } else {
-        rdr.read_u16::<BigEndian>()? as u32
-    };
-
-    Ok(PeerEntry {
-        peer_bgp_id,
-        ip_addr,
-        asn
-    })
 }
 
 #[derive(Debug)]
@@ -271,7 +273,7 @@ pub struct RibSubEntry {
 }
 
 impl RibSubEntry {
-    pub fn parse<R: ReadBytesExt>(rdr: &mut R) -> io::Result<RibSubEntry> {
+    fn parse<R: ReadBytesExt>(rdr: &mut R) -> io::Result<RibSubEntry> {
         let peer_index = rdr.read_u16::<BigEndian>()?;
         let originated_time = rdr.read_u32::<BigEndian>()?;
         let attribute_length = rdr.read_u16::<BigEndian>()?;
