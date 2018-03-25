@@ -10,23 +10,6 @@ use ip_network::{IpNetwork, Ipv4Network, Ipv6Network};
 pub mod bgp;
 pub mod processor;
 
-fn read_ip_addr<R: ReadBytesExt>(rdr: &mut R, is_ipv6: bool) -> io::Result<IpAddr> {
-    if is_ipv6 {
-        Ok(IpAddr::V6(Ipv6Addr::new(
-            rdr.read_u16::<BigEndian>()?,
-            rdr.read_u16::<BigEndian>()?,
-            rdr.read_u16::<BigEndian>()?,
-            rdr.read_u16::<BigEndian>()?,
-            rdr.read_u16::<BigEndian>()?,
-            rdr.read_u16::<BigEndian>()?,
-            rdr.read_u16::<BigEndian>()?,
-            rdr.read_u16::<BigEndian>()?,
-        )))
-    } else {
-        Ok(IpAddr::V4(Ipv4Addr::from(rdr.read_u32::<BigEndian>()?)))
-    }
-}
-
 pub struct Parser<R: ReadBytesExt> {
     reader: R,
 }
@@ -288,6 +271,16 @@ impl RibSubEntry {
 
     pub fn get_bgp_attributes(&self) -> io::Result<Vec<bgp::Attribute>> {
         bgp::Attribute::parse_all(&self.data)
+    }
+}
+
+fn read_ip_addr<R: ReadBytesExt>(rdr: &mut R, is_ipv6: bool) -> io::Result<IpAddr> {
+    if is_ipv6 {
+        let mut buffer = [0; 16];
+        rdr.read_exact(&mut buffer)?;
+        Ok(IpAddr::V6(Ipv6Addr::from(buffer)))
+    } else {
+        Ok(IpAddr::V4(Ipv4Addr::from(rdr.read_u32::<BigEndian>()?)))
     }
 }
 
