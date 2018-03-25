@@ -1,5 +1,6 @@
 use std::error::Error;
-use {BgpPathSegmentType, BgpAttributeAsPath, RibEntry, BgpAttribute};
+use RibEntry;
+use bgp::{BgpAttribute, BgpPathSegmentType, BgpAttributeAsPath};
 
 fn is_asn_bogus(input: u32) -> bool {
     input == 0 || (input >= 64_496 && input <= 131_071) || input >= 4_200_000_000 || input > 1_000_000
