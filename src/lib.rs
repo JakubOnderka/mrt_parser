@@ -3,8 +3,8 @@ extern crate ip_network;
 
 use std::io::{self, Cursor};
 use std::str;
-use byteorder::{BigEndian, ReadBytesExt};
 use std::net::{Ipv6Addr, Ipv4Addr, IpAddr};
+use byteorder::{BigEndian, ReadBytesExt};
 use ip_network::{IpNetwork, Ipv4Network, Ipv6Network};
 
 pub mod processor;
@@ -103,10 +103,10 @@ impl<R: ReadBytesExt> Parser<R> {
                         let ip = Ipv6Addr::from(parts);
                         IpNetwork::V6(Ipv6Network::from(ip, prefix_length).unwrap())
                     },
-                    _ => unimplemented!(),
+                    _ => unimplemented!("TableDumpV2 {:?} subtype", subtype),
                 }
             },
-            _ => unimplemented!(),
+            _ => unimplemented!("{:?} MrtType", typ),
         };
 
         let entry_count = self.reader.read_u16::<BigEndian>()?;
