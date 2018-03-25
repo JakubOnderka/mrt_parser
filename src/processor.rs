@@ -6,7 +6,7 @@ fn is_asn_bogus(input: u32) -> bool {
 }
 
 pub fn get_origin_as_from_bgp_attrbite_as_path(path: &BgpAttributeAsPath) -> Result<Vec<u32>, Box<Error>> {
-    let path_segments = path.get_path_segments();
+    let path_segments = path.get_path_segments()?;
     debug_assert!(path_segments[0].typ == BgpPathSegmentType::AsSequence);
 
     for path_segment in path_segments.iter().rev() {
@@ -34,7 +34,7 @@ pub fn get_origin_as_from_bgp_attrbite_as_path(path: &BgpAttributeAsPath) -> Res
 pub fn get_origin_as_from_rib_entry(input: &RibEntry) -> Result<Vec<u32>, Box<Error>> {
     let mut output = vec![];
     for sub_entry in &input.sub_entries {
-        for attribute in sub_entry.get_bgp_attributes() {
+        for attribute in sub_entry.get_bgp_attributes()? {
             if let BgpAttribute::AsPath(ref as_path) = attribute {
                 output.append(&mut get_origin_as_from_bgp_attrbite_as_path(as_path)?)
             }

@@ -231,13 +231,13 @@ impl RibSubEntry {
         })
     }
 
-    pub fn get_bgp_attributes(&self) -> Vec<BgpAttribute> {
+    pub fn get_bgp_attributes(&self) -> io::Result<Vec<BgpAttribute>> {
         let mut cursor = Cursor::new(&self.data);
         let mut output = vec![];
         while cursor.position() < self.data.len() as u64 {
-            output.push(BgpAttribute::parse(&mut cursor).unwrap());
+            output.push(BgpAttribute::parse(&mut cursor)?);
         }
-        output
+        Ok(output)
     }
 }
 
@@ -276,13 +276,13 @@ pub struct BgpAttributeAsPath {
 }
 
 impl BgpAttributeAsPath {
-    pub fn get_path_segments(&self) -> Vec<BgpPathSegment> {
+    pub fn get_path_segments(&self) -> io::Result<Vec<BgpPathSegment>> {
         let mut cursor = Cursor::new(&self.data);
         let mut output = vec![];
         while cursor.position() < self.data.len() as u64 {
-            output.push(BgpPathSegment::parse(&mut cursor).unwrap());
+            output.push(BgpPathSegment::parse(&mut cursor)?);
         }
-        output
+        Ok(output)
     }
 }
 
