@@ -48,11 +48,11 @@ pub struct AttributeAsPath {
 }
 
 impl AttributeAsPath {
-    pub fn get_path_segments(&self) -> io::Result<Vec<PathSegment>> {
+    pub fn get_path_segments(&self, is_asn_32bit: bool) -> io::Result<Vec<PathSegment>> {
         let mut cursor = Cursor::new(&self.data);
         let mut output = vec![];
         while cursor.position() < self.data.len() as u64 {
-            output.push(PathSegment::parse(&mut cursor)?);
+            output.push(PathSegment::parse(&mut cursor, is_asn_32bit)?);
         }
         Ok(output)
     }
@@ -93,7 +93,7 @@ pub enum PathSegmentType {
 }
 
 impl PathSegment {
-    pub fn parse<R: ReadBytesExt>(rdr: &mut R) -> io::Result<Self> {
+    pub fn parse<R: ReadBytesExt>(rdr: &mut R, is_asn_32bit: bool) -> io::Result<Self> {
         let seg_type = rdr.read_u8()?;
         let typ = match seg_type {
             1 => PathSegmentType::AsSet,
@@ -107,7 +107,11 @@ impl PathSegment {
 
         let mut values = Vec::with_capacity(count as usize);
         for _ in 0..count {
-            values.push(rdr.read_u32::<BigEndian>()?);
+            if is_asn_32bit {
+                values.push(rdr.read_u32::<BigEndian>()?);
+            } else {
+                values.push(rdr.read_u16::<BigEndian>()? as u32);
+            }
         }
 
         Ok(Self {
