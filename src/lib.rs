@@ -58,7 +58,12 @@ impl<R: ReadBytesExt> Parser<R> {
 
         let view_name_length = self.reader.read_u16::<BigEndian>()?;
         let view_name_buffer = read_exact(&mut self.reader, view_name_length as usize)?;
-        let view_name: String = str::from_utf8(&view_name_buffer).unwrap().into();
+        let view_name = str::from_utf8(&view_name_buffer)
+            .map(|x| x.to_string())
+            .map_err(|_| io::Error::new(
+                io::ErrorKind::InvalidData,
+                "PeerIndexTable view name did not contain valid UTF-8"
+            ))?;
 
         let peer_count = self.reader.read_u16::<BigEndian>()?;
 
