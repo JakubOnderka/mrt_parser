@@ -1,5 +1,5 @@
 use std::error::Error;
-use RibEntry;
+use {RibEntry, Afi};
 use bgp::{Attribute, PathSegmentType, AttributeAsPath};
 
 fn is_asn_bogus(input: u32) -> bool {
@@ -39,6 +39,19 @@ pub fn get_origin_as_from_rib_entry(input: &RibEntry) -> Result<Vec<u32>, Box<Er
             if let Attribute::AsPath(ref as_path) = attribute {
                 output.append(&mut get_origin_as_from_bgp_attribute_as_path(as_path, true)?)
             }
+        }
+    }
+
+    output.sort_unstable();
+    output.dedup();
+    Ok(output)
+}
+
+pub fn get_origin_as_from_afi(afi: &Afi) -> Result<Vec<u32>, Box<Error>> {
+    let mut output = vec![];
+    for attribute in afi.get_bgp_attributes()? {
+        if let Attribute::AsPath(ref as_path) = attribute {
+            output.append(&mut get_origin_as_from_bgp_attribute_as_path(as_path, false)?)
         }
     }
 
