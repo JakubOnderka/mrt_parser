@@ -259,8 +259,7 @@ impl BgpAttribute {
             rdr.read_u8()? as u16
         };
 
-        let mut data = vec![0; length as usize];
-        rdr.read_exact(data.as_mut_slice())?;
+        let data = read_exact(rdr, length as usize)?;
 
         Ok(match type_id {
             2 => BgpAttribute::AsPath(BgpAttributeAsPath {
