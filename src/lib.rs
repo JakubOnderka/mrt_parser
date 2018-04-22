@@ -10,6 +10,40 @@ use ip_network::{IpNetwork, Ipv4Network, Ipv6Network};
 pub mod bgp;
 pub mod processor;
 
+pub trait Message<M> {
+    fn parse<R: ReadBytesExt>(reader: &mut R, header: &MrtHeader) -> io::Result<M>;
+    fn can_parse(typ: MrtType) -> bool;
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum TableDump {
+    AfiIpv4,
+    AfiIpv6,
+    Unknown(u16),
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum TableDumpV2 {
+    PeerIndex,
+    RibIpv4Unicast,
+    RibIpv6Unicast,
+    Unknown(u16),
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum MrtType {
+    TableDump(TableDump),
+    TableDumpV2(TableDumpV2),
+    Unknown(u16),
+}
+
+#[derive(Debug)]
+pub struct MrtHeader {
+    pub timestamp: u32,
+    pub typ: MrtType,
+    pub length: u32,
+}
+
 pub struct Parser<R: ReadBytesExt> {
     reader: R,
 }
@@ -17,7 +51,7 @@ pub struct Parser<R: ReadBytesExt> {
 impl<R: ReadBytesExt> Parser<R> {
     pub fn new(reader: R) -> Self {
         Self {
-            reader
+            reader,
         }
     }
 
@@ -54,27 +88,54 @@ impl<R: ReadBytesExt> Parser<R> {
         Ok(())
     }
 
-    pub fn read_afi(&mut self, subtype: TableDump) -> io::Result<Afi> {
-        let is_ipv6 = match subtype {
-            TableDump::AfiIpv4 => false,
-            TableDump::AfiIpv6 => true,
-            _ => unimplemented!("Only AFI_IPv4 and AFI_IPv6 subtypes are supported"),
+    pub fn read_message<M: Message<M>>(&mut self, header: &MrtHeader) -> io::Result<M> {
+        if !M::can_parse(header.typ) {
+            panic!("This parser cannot parse {:?}", header.typ);
+        }
+
+        M::parse(&mut self.reader, header)
+    }
+}
+
+#[derive(Debug)]
+pub struct Afi {
+    pub view_number: u16,
+    pub sequence_number: u16,
+    pub prefix: IpNetwork,
+    pub status: u8,
+    pub originated_time: u32,
+    pub peer_ip: IpAddr,
+    pub peer_as: u16,
+    data: Vec<u8>,
+}
+
+impl Message<Afi> for Afi {
+    fn parse<R: ReadBytesExt>(reader: &mut R, header: &MrtHeader) -> io::Result<Self> {
+        let is_ipv6 = match header.typ {
+            MrtType::TableDump(ref subtype) => {
+                match *subtype {
+                    TableDump::AfiIpv4 => false,
+                    TableDump::AfiIpv6 => true,
+                    _ => panic!("Only AFI_IPv4 and AFI_IPv6 subtypes are supported"),
+                }
+            },
+            _ => panic!("Only TableDump types is supported"),
         };
 
-        let view_number = self.reader.read_u16::<BigEndian>()?;
-        let sequence_number = self.reader.read_u16::<BigEndian>()?;
-        let prefix_ip = read_ip_addr(&mut self.reader, is_ipv6)?;
-        let prefix_length = self.reader.read_u8()?;
+        let view_number = reader.read_u16::<BigEndian>()?;
+        let sequence_number = reader.read_u16::<BigEndian>()?;
+        let prefix_ip = read_ip_addr(reader, is_ipv6)?;
+        let prefix_length = reader.read_u8()?;
         let prefix = match prefix_ip {
             IpAddr::V4(ip) => IpNetwork::V4(Ipv4Network::from(ip, prefix_length).unwrap()),
             IpAddr::V6(ip) => IpNetwork::V6(Ipv6Network::from(ip, prefix_length).unwrap()),
         };
-        let status = self.reader.read_u8()?;
-        let originated_time = self.reader.read_u32::<BigEndian>()?;
-        let peer_ip = read_ip_addr(&mut self.reader, is_ipv6)?;
-        let peer_as = self.reader.read_u16::<BigEndian>()?;
-        let attribute_length = self.reader.read_u16::<BigEndian>()?;
-        let data = read_exact(&mut self.reader, attribute_length as usize)?;
+        let status = reader.read_u8()?;
+        let originated_time = reader.read_u32::<BigEndian>()?;
+        let peer_ip = read_ip_addr(reader, is_ipv6)?;
+        let peer_as = reader.read_u16::<BigEndian>()?;
+        let attribute_length = reader.read_u16::<BigEndian>()?;
+        let data = read_exact(reader, attribute_length as usize)?;
 
         Ok(Afi {
             view_number,
@@ -88,11 +149,30 @@ impl<R: ReadBytesExt> Parser<R> {
         })
     }
 
-    pub fn read_peer_index_table(&mut self) -> io::Result<PeerIndexTable> {
-        let collector_bgp_id = self.reader.read_u32::<BigEndian>()?;
+    fn can_parse(typ: MrtType) -> bool {
+        typ == MrtType::TableDump(TableDump::AfiIpv4) || typ == MrtType::TableDump(TableDump::AfiIpv6)
+    }
+}
 
-        let view_name_length = self.reader.read_u16::<BigEndian>()?;
-        let view_name_buffer = read_exact(&mut self.reader, view_name_length as usize)?;
+impl Afi {
+    pub fn get_bgp_attributes(&self) -> io::Result<Vec<bgp::Attribute>> {
+        bgp::Attribute::parse_all(&self.data)
+    }
+}
+
+#[derive(Debug)]
+pub struct PeerIndexTable {
+    pub collector_bgp_id: u32,
+    pub view_name: String,
+    pub peer_entries: Vec<PeerEntry>,
+}
+
+impl Message<PeerIndexTable> for PeerIndexTable {
+    fn parse<R: ReadBytesExt>(reader: &mut R, _: &MrtHeader) -> io::Result<Self> {
+        let collector_bgp_id = reader.read_u32::<BigEndian>()?;
+
+        let view_name_length = reader.read_u16::<BigEndian>()?;
+        let view_name_buffer = read_exact(reader, view_name_length as usize)?;
         let view_name = str::from_utf8(&view_name_buffer)
             .map(|x| x.to_string())
             .map_err(|_| io::Error::new(
@@ -100,11 +180,11 @@ impl<R: ReadBytesExt> Parser<R> {
                 "PeerIndexTable view name did not contain valid UTF-8"
             ))?;
 
-        let peer_count = self.reader.read_u16::<BigEndian>()?;
+        let peer_count = reader.read_u16::<BigEndian>()?;
 
         let mut peer_entries = Vec::with_capacity(peer_count as usize);
         for _ in 0..peer_count {
-            peer_entries.push(PeerEntry::parse(&mut self.reader)?);
+            peer_entries.push(PeerEntry::parse(reader)?);
         }
 
         Ok(PeerIndexTable {
@@ -114,84 +194,9 @@ impl<R: ReadBytesExt> Parser<R> {
         })
     }
 
-    pub fn read_rib_entry(&mut self, typ: MrtType) -> io::Result<RibEntry> {
-        let sequence_number = self.reader.read_u32::<BigEndian>()?;
-
-        let prefix_length = self.reader.read_u8()?;
-        let prefix_bytes = ((prefix_length + 7) / 8) as usize;
-        let prefix_buffer = read_exact(&mut self.reader, prefix_bytes)?;
-
-        let prefix = match typ {
-            MrtType::TableDumpV2(subtype) => {
-                match subtype {
-                    TableDumpV2::RibIpv4Unicast => {
-                        debug_assert!(prefix_length <= 32);
-                        let mut parts: [u8; 4] = [0; 4];
-                        parts[..prefix_bytes].copy_from_slice(prefix_buffer.as_slice());
-                        let ip = Ipv4Addr::from(parts);
-                        IpNetwork::V4(Ipv4Network::from(ip, prefix_length).unwrap())
-                    },
-                    TableDumpV2::RibIpv6Unicast => {
-                        debug_assert!(prefix_length <= 128);
-                        let mut parts: [u8; 16] = [0; 16];
-                        parts[..prefix_bytes].copy_from_slice(prefix_buffer.as_slice());
-                        let ip = Ipv6Addr::from(parts);
-                        IpNetwork::V6(Ipv6Network::from(ip, prefix_length).unwrap())
-                    },
-                    _ => unimplemented!("TableDumpV2 {:?} subtype", subtype),
-                }
-            },
-            _ => unimplemented!("{:?} MrtType", typ),
-        };
-
-        let entry_count = self.reader.read_u16::<BigEndian>()?;
-        let mut sub_entries = Vec::with_capacity(entry_count as usize);
-        for _ in 0..entry_count {
-            sub_entries.push(RibSubEntry::parse(&mut self.reader)?);
-        }
-
-        Ok(RibEntry {
-            sequence_number,
-            prefix,
-            sub_entries,
-        })
+    fn can_parse(typ: MrtType) -> bool {
+        typ == MrtType::TableDumpV2(TableDumpV2::PeerIndex)
     }
-}
-
-#[derive(Debug, Clone)]
-pub enum TableDump {
-    AfiIpv4,
-    AfiIpv6,
-    Unknown(u16),
-}
-
-#[derive(Debug, Clone)]
-pub enum TableDumpV2 {
-    PeerIndex,
-    RibIpv4Unicast,
-    RibIpv6Unicast,
-    Unknown(u16),
-}
-
-#[derive(Debug, Clone)]
-pub enum MrtType {
-    TableDump(TableDump),
-    TableDumpV2(TableDumpV2),
-    Unknown(u16),
-}
-
-#[derive(Debug)]
-pub struct MrtHeader {
-    pub timestamp: u32,
-    pub typ: MrtType,
-    pub length: u32,
-}
-
-#[derive(Debug)]
-pub struct PeerIndexTable {
-    pub collector_bgp_id: u32,
-    pub view_name: String,
-    pub peer_entries: Vec<PeerEntry>,
 }
 
 #[derive(Debug)]
@@ -224,28 +229,60 @@ impl PeerEntry {
 }
 
 #[derive(Debug)]
-pub struct Afi {
-    pub view_number: u16,
-    pub sequence_number: u16,
-    pub prefix: IpNetwork,
-    pub status: u8,
-    pub originated_time: u32,
-    pub peer_ip: IpAddr,
-    pub peer_as: u16,
-    data: Vec<u8>,
-}
-
-impl Afi {
-    pub fn get_bgp_attributes(&self) -> io::Result<Vec<bgp::Attribute>> {
-        bgp::Attribute::parse_all(&self.data)
-    }
-}
-
-#[derive(Debug)]
 pub struct RibEntry {
     pub sequence_number: u32,
     pub prefix: IpNetwork,
     pub sub_entries: Vec<RibSubEntry>,
+}
+
+impl Message<RibEntry> for RibEntry {
+    fn parse<R: ReadBytesExt>(reader: &mut R, header: &MrtHeader) -> io::Result<Self> {
+        let sequence_number = reader.read_u32::<BigEndian>()?;
+
+        let prefix_length = reader.read_u8()?;
+        let prefix_bytes = ((prefix_length + 7) / 8) as usize;
+        let prefix_buffer = read_exact(reader, prefix_bytes)?;
+
+        let prefix = match header.typ {
+            MrtType::TableDumpV2(ref subtype) => {
+                match *subtype {
+                    TableDumpV2::RibIpv4Unicast => {
+                        debug_assert!(prefix_length <= 32);
+                        let mut parts: [u8; 4] = [0; 4];
+                        parts[..prefix_bytes].copy_from_slice(prefix_buffer.as_slice());
+                        let ip = Ipv4Addr::from(parts);
+                        IpNetwork::V4(Ipv4Network::from(ip, prefix_length).unwrap())
+                    },
+                    TableDumpV2::RibIpv6Unicast => {
+                        debug_assert!(prefix_length <= 128);
+                        let mut parts: [u8; 16] = [0; 16];
+                        parts[..prefix_bytes].copy_from_slice(prefix_buffer.as_slice());
+                        let ip = Ipv6Addr::from(parts);
+                        IpNetwork::V6(Ipv6Network::from(ip, prefix_length).unwrap())
+                    },
+                    _ => panic!("This parser cannot parse TableDumpV2 {:?} subtype", subtype),
+                }
+            },
+            _ => panic!("This parser cannot parse {:?} type", header.typ),
+        };
+
+        let entry_count = reader.read_u16::<BigEndian>()?;
+        let mut sub_entries = Vec::with_capacity(entry_count as usize);
+        for _ in 0..entry_count {
+            sub_entries.push(RibSubEntry::parse(reader)?);
+        }
+
+        Ok(RibEntry {
+            sequence_number,
+            prefix,
+            sub_entries,
+        })
+    }
+
+    fn can_parse(typ: MrtType) -> bool {
+        typ == MrtType::TableDumpV2(TableDumpV2::RibIpv4Unicast) ||
+            typ == MrtType::TableDumpV2(TableDumpV2::RibIpv6Unicast)
+    }
 }
 
 #[derive(Debug)]
