@@ -10,7 +10,7 @@ pub enum Attribute {
 }
 
 impl Attribute {
-    pub fn parse_all(input: &[u8]) -> io::Result<Vec<Attribute>> {
+    pub fn parse_all(input: &[u8]) -> io::Result<Vec<Self>> {
         let mut cursor = Cursor::new(input);
         let mut output = vec![];
         while cursor.position() < input.len() as u64 {
