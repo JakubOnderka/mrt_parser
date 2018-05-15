@@ -17,5 +17,5 @@ Multi-Threaded Routing Toolkit (MRT) Routing Information Export Format parser (R
 travis-ci = { repository = "JakubOnderka/mrt_parser" }
 
 [dependencies]
-ip_network = "0.1.2"
+ip_network = "0.2.0"
 byteorder = "1"
