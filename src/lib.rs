@@ -112,8 +112,8 @@ pub struct Afi {
 impl Message<Afi> for Afi {
     fn parse<R: ReadBytesExt>(reader: &mut R, header: &MrtHeader) -> io::Result<Self> {
         let is_ipv6 = match header.typ {
-            MrtType::TableDump(ref subtype) => {
-                match *subtype {
+            MrtType::TableDump(subtype) => {
+                match subtype {
                     TableDump::AfiIpv4 => false,
                     TableDump::AfiIpv6 => true,
                     _ => panic!("Only AFI_IPv4 and AFI_IPv6 subtypes are supported"),
@@ -244,8 +244,8 @@ impl Message<RibEntry> for RibEntry {
         let prefix_buffer = read_exact(reader, prefix_bytes)?;
 
         let prefix = match header.typ {
-            MrtType::TableDumpV2(ref subtype) => {
-                match *subtype {
+            MrtType::TableDumpV2(subtype) => {
+                match subtype {
                     TableDumpV2::RibIpv4Unicast => {
                         debug_assert!(prefix_length <= 32);
                         let mut parts: [u8; 4] = [0; 4];
