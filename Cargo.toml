@@ -1,6 +1,6 @@
 [package]
 name = "mrt_parser"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Jakub Onderka <ahoj@jakubonderka.cz>"]
 license = "BSD-2-Clause"
 keywords = ["ipnetwork", "mrt", "bgp", "rfc6396"]
