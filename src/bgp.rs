@@ -1,6 +1,6 @@
-use std::io::{self, Cursor};
 use byteorder::{BigEndian, ReadBytesExt};
 use read_exact;
+use std::io::{self, Cursor};
 
 #[derive(Debug)]
 pub enum Attribute {
@@ -34,9 +34,7 @@ impl Attribute {
 
         Ok(match type_id {
             1 => Attribute::Origin(AttributeOrigin::from(data[0])),
-            2 => Attribute::AsPath(AttributeAsPath {
-                data,
-            }),
+            2 => Attribute::AsPath(AttributeAsPath { data }),
             _ => Attribute::Unknown(type_id),
         })
     }
@@ -114,9 +112,6 @@ impl PathSegment {
             }
         }
 
-        Ok(Self {
-            typ,
-            values,
-        })
+        Ok(Self { typ, values })
     }
 }

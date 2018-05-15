@@ -1,11 +1,11 @@
 extern crate byteorder;
 extern crate ip_network;
 
-use std::io;
-use std::str;
-use std::net::{Ipv6Addr, Ipv4Addr, IpAddr};
 use byteorder::{BigEndian, ReadBytesExt};
 use ip_network::{IpNetwork, Ipv4Network, Ipv6Network};
+use std::io;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::str;
 
 pub mod bgp;
 pub mod processor;
@@ -50,9 +50,7 @@ pub struct Parser<R: ReadBytesExt> {
 
 impl<R: ReadBytesExt> Parser<R> {
     pub fn new(reader: R) -> Self {
-        Self {
-            reader,
-        }
+        Self { reader }
     }
 
     pub fn read_header(&mut self) -> io::Result<MrtHeader> {
@@ -112,12 +110,10 @@ pub struct Afi {
 impl Message<Afi> for Afi {
     fn parse<R: ReadBytesExt>(reader: &mut R, header: &MrtHeader) -> io::Result<Self> {
         let is_ipv6 = match header.typ {
-            MrtType::TableDump(subtype) => {
-                match subtype {
-                    TableDump::AfiIpv4 => false,
-                    TableDump::AfiIpv6 => true,
-                    _ => panic!("Only AFI_IPv4 and AFI_IPv6 subtypes are supported"),
-                }
+            MrtType::TableDump(subtype) => match subtype {
+                TableDump::AfiIpv4 => false,
+                TableDump::AfiIpv6 => true,
+                _ => panic!("Only AFI_IPv4 and AFI_IPv6 subtypes are supported"),
             },
             _ => panic!("Only TableDump types is supported"),
         };
@@ -150,7 +146,8 @@ impl Message<Afi> for Afi {
     }
 
     fn can_parse(typ: MrtType) -> bool {
-        typ == MrtType::TableDump(TableDump::AfiIpv4) || typ == MrtType::TableDump(TableDump::AfiIpv6)
+        typ == MrtType::TableDump(TableDump::AfiIpv4)
+            || typ == MrtType::TableDump(TableDump::AfiIpv6)
     }
 }
 
@@ -175,10 +172,12 @@ impl Message<PeerIndexTable> for PeerIndexTable {
         let view_name_buffer = read_exact(reader, view_name_length as usize)?;
         let view_name = str::from_utf8(&view_name_buffer)
             .map(|x| x.to_string())
-            .map_err(|_| io::Error::new(
-                io::ErrorKind::InvalidData,
-                "PeerIndexTable view name did not contain valid UTF-8"
-            ))?;
+            .map_err(|_| {
+                io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "PeerIndexTable view name did not contain valid UTF-8",
+                )
+            })?;
 
         let peer_count = reader.read_u16::<BigEndian>()?;
 
@@ -223,7 +222,7 @@ impl PeerEntry {
         Ok(Self {
             peer_bgp_id,
             ip_addr,
-            asn
+            asn,
         })
     }
 }
@@ -244,24 +243,22 @@ impl Message<RibEntry> for RibEntry {
         let prefix_buffer = read_exact(reader, prefix_bytes)?;
 
         let prefix = match header.typ {
-            MrtType::TableDumpV2(subtype) => {
-                match subtype {
-                    TableDumpV2::RibIpv4Unicast => {
-                        debug_assert!(prefix_length <= 32);
-                        let mut parts: [u8; 4] = [0; 4];
-                        parts[..prefix_bytes].copy_from_slice(prefix_buffer.as_slice());
-                        let ip = Ipv4Addr::from(parts);
-                        IpNetwork::V4(Ipv4Network::from(ip, prefix_length).unwrap())
-                    },
-                    TableDumpV2::RibIpv6Unicast => {
-                        debug_assert!(prefix_length <= 128);
-                        let mut parts: [u8; 16] = [0; 16];
-                        parts[..prefix_bytes].copy_from_slice(prefix_buffer.as_slice());
-                        let ip = Ipv6Addr::from(parts);
-                        IpNetwork::V6(Ipv6Network::from(ip, prefix_length).unwrap())
-                    },
-                    _ => panic!("This parser cannot parse TableDumpV2 {:?} subtype", subtype),
+            MrtType::TableDumpV2(subtype) => match subtype {
+                TableDumpV2::RibIpv4Unicast => {
+                    debug_assert!(prefix_length <= 32);
+                    let mut parts: [u8; 4] = [0; 4];
+                    parts[..prefix_bytes].copy_from_slice(prefix_buffer.as_slice());
+                    let ip = Ipv4Addr::from(parts);
+                    IpNetwork::V4(Ipv4Network::from(ip, prefix_length).unwrap())
                 }
+                TableDumpV2::RibIpv6Unicast => {
+                    debug_assert!(prefix_length <= 128);
+                    let mut parts: [u8; 16] = [0; 16];
+                    parts[..prefix_bytes].copy_from_slice(prefix_buffer.as_slice());
+                    let ip = Ipv6Addr::from(parts);
+                    IpNetwork::V6(Ipv6Network::from(ip, prefix_length).unwrap())
+                }
+                _ => panic!("This parser cannot parse TableDumpV2 {:?} subtype", subtype),
             },
             _ => panic!("This parser cannot parse {:?} type", header.typ),
         };
@@ -280,8 +277,8 @@ impl Message<RibEntry> for RibEntry {
     }
 
     fn can_parse(typ: MrtType) -> bool {
-        typ == MrtType::TableDumpV2(TableDumpV2::RibIpv4Unicast) ||
-            typ == MrtType::TableDumpV2(TableDumpV2::RibIpv6Unicast)
+        typ == MrtType::TableDumpV2(TableDumpV2::RibIpv4Unicast)
+            || typ == MrtType::TableDumpV2(TableDumpV2::RibIpv6Unicast)
     }
 }
 
