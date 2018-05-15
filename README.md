@@ -18,7 +18,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-mrt_parser = "0.1"
+mrt_parser = "0.2"
 ```
 
 and this to your crate root:
@@ -26,3 +26,6 @@ and this to your crate root:
 ```rust
 extern crate mrt_parser;
 ```
+
+Minimal required version of Rust compiler is 1.26 (because of `ip_network` crate). 
+
