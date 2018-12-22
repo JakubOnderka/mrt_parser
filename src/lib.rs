@@ -119,10 +119,7 @@ impl Message<Afi> for Afi {
         let sequence_number = reader.read_u16::<BigEndian>()?;
         let prefix_ip = read_ip_addr(reader, is_ipv6)?;
         let prefix_length = reader.read_u8()?;
-        let prefix = match prefix_ip {
-            IpAddr::V4(ip) => IpNetwork::V4(Ipv4Network::from(ip, prefix_length).unwrap()),
-            IpAddr::V6(ip) => IpNetwork::V6(Ipv6Network::from(ip, prefix_length).unwrap()),
-        };
+        let prefix = IpNetwork::from(prefix_ip, prefix_length).unwrap();
         let status = reader.read_u8()?;
         let originated_time = reader.read_u32::<BigEndian>()?;
         let peer_ip = read_ip_addr(reader, is_ipv6)?;
