@@ -12,6 +12,7 @@ documentation = "https://docs.rs/mrt_parser"
 description = """
 Multi-Threaded Routing Toolkit (MRT) Routing Information Export Format parser (RFC 6396)
 """
+edition = "2018"
 
 [badges]
 travis-ci = { repository = "JakubOnderka/mrt_parser" }

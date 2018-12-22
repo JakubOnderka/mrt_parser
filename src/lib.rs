@@ -1,11 +1,8 @@
-extern crate byteorder;
-extern crate ip_network;
-
-use byteorder::{BigEndian, ReadBytesExt};
-use ip_network::{IpNetwork, Ipv4Network, Ipv6Network};
 use std::io;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::str;
+use byteorder::{BigEndian, ReadBytesExt};
+use ip_network::{IpNetwork, Ipv4Network, Ipv6Network};
 
 pub mod bgp;
 pub mod processor;

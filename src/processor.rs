@@ -1,6 +1,6 @@
-use bgp::{Attribute, AttributeAsPath, PathSegmentType};
 use std::error::Error;
-use {Afi, RibEntry};
+use crate::bgp::{Attribute, AttributeAsPath, PathSegmentType};
+use crate::{Afi, RibEntry};
 
 fn is_asn_bogus(input: u32) -> bool {
     input == 0 || (input >= 64_496 && input <= 131_071) || input >= 4_200_000_000

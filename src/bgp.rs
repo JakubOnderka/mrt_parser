@@ -1,6 +1,6 @@
-use byteorder::{BigEndian, ReadBytesExt};
-use read_exact;
 use std::io::{self, Cursor};
+use byteorder::{BigEndian, ReadBytesExt};
+use crate::read_exact;
 
 #[derive(Debug)]
 pub enum Attribute {
