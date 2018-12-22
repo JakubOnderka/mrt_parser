@@ -2,9 +2,16 @@ use std::error::Error;
 use crate::bgp::{Attribute, AttributeAsPath, PathSegmentType};
 use crate::{Afi, RibEntry};
 
+/// These ASN are bogus because:
+/// - 0 is reserved
+/// - 64496-64511 are reserved for use in documentation and sample code
+/// - 64512-65534 are reserved for Private Use
+/// - 65535 is reserved
+/// - 65536-65551 are reserved for use in documentation and sample code
+/// - 65552-131071 are reserved
+/// - ASN bigger than 399261 are not allocated now, so with reserve we consider ASN bigger than 1000000 as bogus
 fn is_asn_bogus(input: u32) -> bool {
-    input == 0 || (input >= 64_496 && input <= 131_071) || input >= 4_200_000_000
-        || input > 1_000_000
+    input == 0 || (input >= 64_496 && input <= 131_071) || input > 1_000_000
 }
 
 pub fn get_origin_as_from_bgp_attribute_as_path(
