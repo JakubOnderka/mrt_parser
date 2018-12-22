@@ -50,8 +50,17 @@ impl<R: ReadBytesExt> Parser<R> {
         Self { reader }
     }
 
-    pub fn read_header(&mut self) -> io::Result<MrtHeader> {
-        let timestamp = self.reader.read_u32::<BigEndian>()?;
+    pub fn read_header(&mut self) -> io::Result<Option<MrtHeader>> {
+        let timestamp = match self.reader.read_u32::<BigEndian>() {
+            Ok(timestamp) => timestamp,
+            Err(e) => {
+                return if e.kind() == io::ErrorKind::UnexpectedEof {
+                    Ok(None)
+                } else {
+                    Err(e)
+                }
+            }
+        };
         let typ = self.reader.read_u16::<BigEndian>()?;
         let subtype = self.reader.read_u16::<BigEndian>()?;
         let length = self.reader.read_u32::<BigEndian>()?;
@@ -71,11 +80,11 @@ impl<R: ReadBytesExt> Parser<R> {
             _ => MrtType::Unknown(typ),
         };
 
-        Ok(MrtHeader {
+        Ok(Some(MrtHeader {
             timestamp,
             typ,
             length,
-        })
+        }))
     }
 
     pub fn skip_message(&mut self, header: &MrtHeader) -> io::Result<()> {
