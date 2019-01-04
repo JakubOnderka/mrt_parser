@@ -128,7 +128,7 @@ impl Message<Afi> for Afi {
         let sequence_number = reader.read_u16::<BigEndian>()?;
         let prefix_ip = read_ip_addr(reader, is_ipv6)?;
         let prefix_length = reader.read_u8()?;
-        let prefix = IpNetwork::from(prefix_ip, prefix_length).unwrap();
+        let prefix = IpNetwork::new(prefix_ip, prefix_length).unwrap();
         let status = reader.read_u8()?;
         let originated_time = reader.read_u32::<BigEndian>()?;
         let peer_ip = read_ip_addr(reader, is_ipv6)?;
@@ -252,14 +252,14 @@ impl Message<RibEntry> for RibEntry {
                     let mut parts: [u8; 4] = [0; 4];
                     parts[..prefix_bytes].copy_from_slice(prefix_buffer.as_slice());
                     let ip = Ipv4Addr::from(parts);
-                    IpNetwork::V4(Ipv4Network::from(ip, prefix_length).unwrap())
+                    IpNetwork::V4(Ipv4Network::new(ip, prefix_length).unwrap())
                 }
                 TableDumpV2::RibIpv6Unicast => {
                     debug_assert!(prefix_length <= 128);
                     let mut parts: [u8; 16] = [0; 16];
                     parts[..prefix_bytes].copy_from_slice(prefix_buffer.as_slice());
                     let ip = Ipv6Addr::from(parts);
-                    IpNetwork::V6(Ipv6Network::from(ip, prefix_length).unwrap())
+                    IpNetwork::V6(Ipv6Network::new(ip, prefix_length).unwrap())
                 }
                 _ => panic!("This parser cannot parse TableDumpV2 {:?} subtype", subtype),
             },
