@@ -18,7 +18,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-mrt_parser = "0.3"
+mrt_parser = "0.4"
 ```
 
 and this to your crate root:
