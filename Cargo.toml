@@ -1,6 +1,6 @@
 [package]
 name = "mrt_parser"
-version = "0.4.0"
+version = "0.5.0"
 authors = ["Jakub Onderka <ahoj@jakubonderka.cz>"]
 license = "BSD-2-Clause"
 keywords = ["ipnetwork", "mrt", "bgp", "rfc6396"]
@@ -15,7 +15,7 @@ Multi-Threaded Routing Toolkit (MRT) Routing Information Export Format parser (R
 edition = "2018"
 
 [badges]
-travis-ci = { repository = "JakubOnderka/mrt_parser" }
+maintenance = { status = "passively-maintained" }
 
 [dependencies]
 ip_network = "0.4.0"
