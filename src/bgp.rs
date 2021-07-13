@@ -1,6 +1,6 @@
-use std::io::{self, Cursor};
-use byteorder::{BigEndian, ReadBytesExt};
 use crate::read_exact;
+use byteorder::{BigEndian, ReadBytesExt};
+use std::io::{self, Cursor};
 
 #[derive(Debug)]
 pub enum Attribute {
@@ -92,13 +92,12 @@ pub enum PathSegmentType {
 
 impl PathSegment {
     pub fn parse<R: ReadBytesExt>(rdr: &mut R, is_asn_32bit: bool) -> io::Result<Self> {
-        let seg_type = rdr.read_u8()?;
-        let typ = match seg_type {
+        let typ = match rdr.read_u8()? {
             1 => PathSegmentType::AsSet,
             2 => PathSegmentType::AsSequence,
             3 => PathSegmentType::AsConfedSequence,
             4 => PathSegmentType::AsConfedSet,
-            _ => PathSegmentType::Unknown(seg_type),
+            n => PathSegmentType::Unknown(n),
         };
 
         let count = rdr.read_u8()?;
