@@ -1,6 +1,6 @@
-use std::error::Error;
 use crate::bgp::{Attribute, AttributeAsPath, PathSegmentType};
 use crate::{Afi, RibEntry};
+use std::error::Error;
 
 /// These ASN are bogus because:
 /// - 0 is reserved
@@ -39,15 +39,14 @@ pub fn get_origin_as_from_bgp_attribute_as_path(
                     .collect());
             }
             _ => {
-                return Err(From::from(format!(
-                    "Invalid/Legacy BGP Path Segment: {:?}",
-                    path_segment.typ
-                )))
+                return Err(
+                    format!("Invalid/Legacy BGP Path Segment: {:?}", path_segment.typ).into(),
+                )
             }
         }
     }
 
-    Err(From::from("No origin"))
+    Err("No origin".into())
 }
 
 pub fn get_origin_as_from_rib_entry(input: &RibEntry) -> Result<Vec<u32>, Box<dyn Error>> {
@@ -56,8 +55,7 @@ pub fn get_origin_as_from_rib_entry(input: &RibEntry) -> Result<Vec<u32>, Box<dy
         for attribute in sub_entry.get_bgp_attributes()? {
             if let Attribute::AsPath(ref as_path) = attribute {
                 output.append(&mut get_origin_as_from_bgp_attribute_as_path(
-                    as_path,
-                    true,
+                    as_path, true,
                 )?)
             }
         }
@@ -73,8 +71,7 @@ pub fn get_origin_as_from_afi(afi: &Afi) -> Result<Vec<u32>, Box<dyn Error>> {
     for attribute in afi.get_bgp_attributes()? {
         if let Attribute::AsPath(ref as_path) = attribute {
             output.append(&mut get_origin_as_from_bgp_attribute_as_path(
-                as_path,
-                false,
+                as_path, false,
             )?)
         }
     }
