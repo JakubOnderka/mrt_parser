@@ -2,7 +2,6 @@ use byteorder::{BigEndian, ReadBytesExt};
 use ip_network::{IpNetwork, Ipv4Network, Ipv6Network};
 use std::io;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
-use std::str;
 
 pub mod bgp;
 pub mod processor;
@@ -173,8 +172,7 @@ impl Message<PeerIndexTable> for PeerIndexTable {
 
         let view_name_length = reader.read_u16::<BigEndian>()?;
         let view_name_buffer = read_exact(reader, view_name_length as usize)?;
-        let view_name = str::from_utf8(&view_name_buffer)
-            .map(|x| x.to_string())
+        let view_name = String::from_utf8(view_name_buffer)
             .map_err(|_| {
                 io::Error::new(
                     io::ErrorKind::InvalidData,
@@ -250,14 +248,14 @@ impl Message<RibEntry> for RibEntry {
                 TableDumpV2::RibIpv4Unicast => {
                     debug_assert!(prefix_length <= 32);
                     let mut parts: [u8; 4] = [0; 4];
-                    parts[..prefix_bytes].copy_from_slice(prefix_buffer.as_slice());
+                    parts[..prefix_bytes].copy_from_slice(&prefix_buffer);
                     let ip = Ipv4Addr::from(parts);
                     IpNetwork::V4(Ipv4Network::new(ip, prefix_length).unwrap())
                 }
                 TableDumpV2::RibIpv6Unicast => {
                     debug_assert!(prefix_length <= 128);
                     let mut parts: [u8; 16] = [0; 16];
-                    parts[..prefix_bytes].copy_from_slice(prefix_buffer.as_slice());
+                    parts[..prefix_bytes].copy_from_slice(&prefix_buffer);
                     let ip = Ipv6Addr::from(parts);
                     IpNetwork::V6(Ipv6Network::new(ip, prefix_length).unwrap())
                 }
